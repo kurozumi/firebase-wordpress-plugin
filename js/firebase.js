@@ -1,88 +1,90 @@
-(function( $ ) {
-  'use strict';
+(function ($) {
+    'use strict';
 
-  if(typeof window.firebaseOptions !== 'undefined'){
+    if (typeof window.firebaseOptions !== 'undefined') {
 
-    // Initialize FirebaseApp
-    if (!firebase.apps.length) {
-        firebase.initializeApp(window.firebaseOptions);
-    }
-
-    $(document).ready(function(){
-      // Check user state
-      checkUserState().then(loggedin => {
-          if(loggedin){
-              $('#firebase-show').show();
-              showGreetings();
-          } else {
-              $('#firebase-show').hide();
-          }
-      })
-
-      // Firebase login
-      $("#firebase-form-submit").click(function(event){
-        event.preventDefault();
-        let data = $('#firebase-login-form :input').serializeArray();
-        let email = data[0].value;
-        let password = data[1].value;
-
-        // start login into firebase
-        if(email !== '' && password !== ''){
-            firebase.auth().signInWithEmailAndPassword(email, password)
-            .then(() => {
-                $('#firebase-show').show();
-                showGreetings();
-            })
-            .catch( error => {
-                console.log(error.message);
-            })
-        } else {
-            alert('Your email or password is missing!');
+        // Initialize FirebaseApp
+        if (!firebase.apps.length) {
+            firebase.initializeApp(window.firebaseOptions);
         }
-      });
 
-      // Sign out action
-      $('#firebase-signout').on('click', e => {
-          e.preventDefault();
-          firebase.auth().signOut()
-          .then(() => {
-              $('#firebase-show').hide();
-          })
-          .catch(error => console.log(error))
-      })
+        $(document).ready(function () {
+            // Firebase login
+            $(document).on("click", "#firebase-form-submit", function (event) {
+                event.preventDefault();
+                let data = $('#firebase-login-form :input').serializeArray();
+                let email = data[0].value;
+                let password = data[1].value;
 
-      function checkUserState(){
-          return new Promise((resolve, reject) => {
-              return firebase.auth().onAuthStateChanged(function (user) {
-                  if (user) {
-                      // User is signed in.
-                      resolve(true);
-                  } else {
-                      // User is signed out.
-                      resolve(false);
-                  }
-              });
-          })
-      }
+                // start login into firebase
+                if (email !== '' && password !== '') {
+                    firebase.auth().signInWithEmailAndPassword(email, password)
+                            .then(result => {
+                                emailExists(result.user.email);
+                                //createUser(data.user.email);
+                            }).catch(error => {
+                                switch(error.code) {
+                                    case "auth/wrong-password":
+                                        alert(error.message);
+                                    case "auth/user-not-found":
+                                        alert(error.message);
+                                }
+                            })
+                } else {
+                    alert('Your email or password is missing!');
+                }
+            });
 
-      function showGreetings() {
-          let userName = '';
-          firebase.auth().onAuthStateChanged(function (user) {
-              if (user) {
-                  // User is signed in.
-                  if(user.displayName === null){
-                    $('#firebase-user').text(`Greetings, ${user.email}!`);
-                  } else {
-                    $('#firebase-user').text(`Greetings, ${user.displayName}!`);
-                  }
+            // Sign out action
+            $(document).on("click", "#firebase-signout", e => {
+                e.preventDefault();
+                firebase.auth().signOut()
+                        .then(() => {
+                        })
+                        .catch(error => {
+                            console.log(error.message)
+                        })
+            })
 
-              } else {
-                $('#firebase-user').hide();
-              }
-          })
-      }
-    })
-  } else {
-    console.warn('Please enter your Firebase settings!');
-  }
-})( jQuery )
+            function createUser(email) {
+                $.ajax({
+                    url: wpApiSettings.root + "wp/v2/users",
+                    method: "POST",
+                    beforeSend: function (xhr) {
+                        xhr.setRequestHeader("X-WP-Nonce", wpApiSettings.nonce);
+                    },
+                    data: {
+                        email: email,
+                        username: email
+                    }
+                }).done(function (response, textStatus, jqXHR) {
+                    console.log(response);
+                    //console.log(response);
+                }).fail(function(jqXHR, textStatus, errorThrown){
+                    alert(jqXHR.responseJSON.message);
+                });
+            }
+            
+            // ワードプレスにメールアドレスが登録されているかチェック
+            function emailExists(email){
+                $.ajax({
+                    url: wpApiSettings.root + "my-rest/v1/user",
+                    method: "POST",
+                    beforeSend: function(xhr) {
+                        xhr.setRequestHeader("X-WP-Nonce", wpApiSettings.nonce)
+                    },
+                    data: {
+                        email: email
+                    }
+                }).done(function(response, textStatus, jqXHR){
+                    console.log(response);
+                    location = "/"
+                }).fail(function(jqXHR, textStatus, errorThrown){
+                    alert(jqXHR.responseJSON.message);
+                });
+            }
+        })
+    } else {
+        console.warn('Please enter your Firebase settings!');
+    }
+})(jQuery)
